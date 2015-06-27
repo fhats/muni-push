@@ -56,5 +56,28 @@ class MuniClient(object):
     def get_next_departures_by_stop_code(self, stop_code):
         API_URL = "http://services.my511.org/Transit2.0/GetNextDeparturesByStopCode.aspx"
         response = self._api_request(API_URL, stopCode=stop_code)
-        return response['RTT']['AgencyList']['Agency']['RouteList']['Route']
+        formatted_response = adapt_departures_by_stop_code(response)
+        # Format the results to be a little bit easier to understand
+        return formatted_response
 
+def adapt_departures_by_stop_code(response):
+    """Takes a response from the 511 API and turns it into something nicer.
+    """
+    route_list = response['RTT']['AgencyList']['Agency']['RouteList']['Route']
+    response_by_line = {}
+
+    for route in route_list:
+        formatted_response = {
+            "direction": route['RouteDirectionList']['RouteDirection']['@Name'],
+            "line_code": route['@Code'],
+            "line_name": route['@Name'],
+            "stop": route['RouteDirectionList']['RouteDirection']['StopList']['Stop']['@StopCode'],
+            "stop_name": route['RouteDirectionList']['RouteDirection']['StopList']['Stop']['@name'],
+            "times": [],
+        }
+        if route['RouteDirectionList']['RouteDirection']['StopList']['Stop']['DepartureTimeList']:
+            formatted_response['times'] = route['RouteDirectionList']['RouteDirection']['StopList']['Stop']['DepartureTimeList']['DepartureTime']
+        formatted_response['times'] = sorted([int(t) for t in formatted_response['times']])
+        response_by_line[route['@Code']] = formatted_response
+
+    return response_by_line
